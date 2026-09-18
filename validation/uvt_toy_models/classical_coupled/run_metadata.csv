@@ -1,0 +1,2 @@
+dt,nsteps,thermo_freq,tdamp,x_init,vx_init,ne_init,ne_vel_init
+0.002,200000,100,0.5,1.0,-0.35,2.1,0.0

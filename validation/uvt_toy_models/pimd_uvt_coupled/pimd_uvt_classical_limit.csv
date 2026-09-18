@@ -1,0 +1,2 @@
+p_quantum,Ne_mean_p1,Ne_bias_vs_analytic,dEdN_mean_p1,dEdN_minus_mu_p1,x_centroid_mean_p1,x_centroid_bias_vs_analytic,Ne_mean_classical,Ne_p1_minus_classical,dEdN_mean_classical,dEdN_p1_minus_classical,x_mean_classical,x_p1_minus_classical
+1.0,1.414598453640949,-0.013972974930479554,0.9758875332636704,-0.024112466736329587,-0.5485523655660425,0.02287620586252892,1.402574432162425,0.012024021478524105,0.9354247607808793,0.040462772482791065,-0.5387237005818121,-0.009828664984230406

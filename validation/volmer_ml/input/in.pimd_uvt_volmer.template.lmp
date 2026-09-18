@@ -1,0 +1,81 @@
+clear
+
+variable        ibead           uloop 99 pad
+variable        PLUGIN_SO       index libdeepmd_lmp.so
+variable        DATA_FILE       index system.lmp
+variable        MODEL_PATH      index model.pb
+variable        NSTEPS          index 300000
+variable        THERMO_FREQ     index 1
+variable        TEMP            index 300.0
+variable        MU              index -3.0
+variable        TDAMP           index 0.05
+variable        UDAMP           index 0.05
+variable        TCHAIN          index 3
+variable        TLOOP           index 1
+variable        VEL_SEED        index 4928459
+variable        NE_INIT         index 0.648702
+variable        NE_VEL_INIT     index 0.0
+variable        DT              index 0.0002
+variable        TDOF            index 549.0
+variable        BEAD_SEED       equal ${VEL_SEED}+1000*${ibead}
+
+units           metal
+boundary        f p p
+atom_style      atomic
+atom_modify     map array
+
+plugin          load ${PLUGIN_SO}
+
+neighbor        1.0 bin
+read_data       ${DATA_FILE}
+
+mass            1 195.000000
+mass            2 1.000000
+mass            3 16.000000
+
+group           layer1 id 1:100:4
+group           layer2 id 2:100:4
+group           bottom union layer1 layer2
+group           move subtract all bottom
+group           Hads id 101:124
+
+compute         movetemp move temp
+compute         bottomtemp bottom temp
+
+pair_style      deepmd ${MODEL_PATH} fparam_from_fix cp 23
+pair_coeff      * *
+
+compute         dEdN all deepmd/fparam/dedn f_cp[23]
+
+fix             cp all pimd/uvt thermostat NHC temp ${TEMP} Tdamp ${TDAMP} &
+                tchain ${TCHAIN} tloop ${TLOOP} mu ${MU} Udamp ${UDAMP} &
+                ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn c_dEdN &
+                tdof ${TDOF} removecom no
+
+fix             freeze bottom setforce 0.0 0.0 0.0
+fix             wall_all all wall/reflect xhi 17.462841
+fix             wall_hads Hads wall/reflect xhi 8.6785028
+velocity        move create ${TEMP} ${BEAD_SEED} mom yes rot yes dist gaussian temp movetemp
+velocity        bottom set 0.0 0.0 0.0
+
+variable        Ne        equal f_cp[23]
+variable        NeDot     equal f_cp[24]
+variable        dEdNfix   equal f_cp[25]
+variable        muFix     equal f_cp[26]
+variable        NeKE      equal f_cp[27]
+variable        MuPE      equal f_cp[28]
+variable        Ecouple   equal f_cp
+variable        HP        equal f_cp[4]
+variable        NHCPot    equal f_cp[17]+f_cp[18]+f_cp[19]
+variable        NHCKin    equal f_cp[20]+f_cp[21]+f_cp[22]
+variable        NHCTotal  equal v_NHCPot+v_NHCKin
+
+thermo          ${THERMO_FREQ}
+thermo_style    custom step temp pe ke etotal c_movetemp c_bottomtemp &
+                v_Ne v_NeDot c_dEdN v_dEdNfix v_muFix v_NeKE v_MuPE v_Ecouple &
+                f_cp[1] f_cp[2] f_cp[3] f_cp[4] &
+                v_HP v_NHCPot v_NHCKin v_NHCTotal
+thermo_modify   flush yes
+
+timestep        ${DT}
+run             ${NSTEPS}

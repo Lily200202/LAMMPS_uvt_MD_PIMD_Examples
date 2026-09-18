@@ -1,0 +1,63 @@
+clear
+
+units           lj
+dimension       3
+boundary        f f f
+atom_style      atomic
+
+variable        kx equal 5.0
+variable        ke equal 5.0
+variable        g equal 2.0
+variable        N0 equal 1.0
+variable        MU equal 1.0
+variable        TEMP equal 1.0
+
+variable        DT index 0.002
+variable        TDAMP index 0.5
+variable        NSTEPS index 200000
+variable        THERMO_FREQ index 100
+variable        X_INIT index 1.0
+variable        VX_INIT index -0.35
+variable        NE_INIT index 2.1
+variable        NE_VEL_INIT index 0.0
+
+region          box block -10 10 -1 1 -1 1
+create_box      1 box
+create_atoms    1 single ${X_INIT} 0.0 0.0
+mass            1 1.0
+
+pair_style      zero 5.0
+pair_coeff      * *
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+
+velocity        all set ${VX_INIT} 0.0 0.0 sum no units box
+timestep        ${DT}
+
+compute         t1d all temp/partial 1 0 0
+compute_modify  t1d extra/dof 0
+
+fix             toy all uvt/toy/coupled cp kx ${kx} ke ${ke} g ${g} n0 ${N0}
+fix             cp all uvt temp ${TEMP} ${TEMP} ${TDAMP} mu ${MU} ${MU} ${TDAMP} &
+                ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn f_toy
+fix_modify      cp temp t1d
+
+variable        xcm equal f_toy[3]
+variable        xstar equal -v_g*(v_MU+v_ke*v_N0)/(v_kx*v_ke-v_g*v_g)
+variable        nestar equal v_kx*(v_MU+v_ke*v_N0)/(v_kx*v_ke-v_g*v_g)
+
+variable        Ne equal f_toy[4]
+variable        Ne_dot equal f_cp[3]
+variable        dEdN equal f_toy[2]
+variable        u_elec equal 0.5*v_ke*(v_Ne-v_N0)*(v_Ne-v_N0)
+variable        u_total equal f_toy[1]
+variable        h_ext equal ke + v_u_total + f_cp
+variable        delta_h_ext equal v_h_ext
+
+thermo          ${THERMO_FREQ}
+thermo_style    custom step temp ke pe etotal v_xcm v_xstar v_Ne v_nestar v_Ne_dot v_dEdN &
+                f_cp[5] f_cp v_u_elec v_u_total v_h_ext
+thermo_modify   temp t1d
+
+run             ${NSTEPS}

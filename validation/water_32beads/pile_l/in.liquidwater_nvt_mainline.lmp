@@ -1,0 +1,52 @@
+clear
+
+# NVT H2O PIMD/Langevin test using the current mainline LAMMPS build.
+
+variable ibead         uloop 99 pad
+variable PLUGIN_SO     index libdeepmd_lmp.so
+variable DATA_FILE     index ../input/conf.lmp
+variable MODEL_PATH    index ../input/graph.pb
+variable NSTEPS        index 100000
+variable THERMO_FREQ   index 100
+variable DUMP_FREQ     index 100
+variable TEMP          index 300.0
+variable TAU_T         index 0.100000
+variable VEL_SEED      index 23456789
+variable RDF_NBINS     index 200
+variable RDF_NEVERY    index 100
+variable RDF_NREPEAT   index 1
+variable RDF_NFREQ     index 100
+
+units                  metal
+boundary               p p p
+atom_style             atomic
+atom_modify            map yes
+
+plugin load            ${PLUGIN_SO}
+
+read_data              ${DATA_FILE}
+
+pair_style             deepmd ${MODEL_PATH}
+pair_coeff             * *
+
+neighbor               2.0 bin
+neigh_modify           every 10 delay 0 check no
+timestep               0.000500
+
+velocity               all create ${TEMP} ${VEL_SEED}
+
+dump                   1 all custom ${DUMP_FREQ} ${ibead}.xyz id type x y z
+dump_modify            1 sort id
+dump                   2 all custom ${DUMP_FREQ} ${ibead}.lammpstrj id type x y z ix iy iz
+dump_modify            2 sort id
+
+compute                rdf all rdf ${RDF_NBINS} 1 1 1 2 2 2
+fix                    2 all ave/time ${RDF_NEVERY} ${RDF_NREPEAT} ${RDF_NFREQ} c_rdf[*] file ${ibead}.rdf mode vector
+
+fix                    1 all pimd/langevin ensemble nvt integrator obabo temp ${TEMP} thermostat PILE_L 1234 tau ${TAU_T}
+thermo                 ${THERMO_FREQ}
+thermo_style           custom step temp pe ke etotal vol lx ly lz density f_1[*]
+thermo_modify          format step %ld format 2* "%.6e"
+
+run                    ${NSTEPS}
+write_data             final.${ibead}

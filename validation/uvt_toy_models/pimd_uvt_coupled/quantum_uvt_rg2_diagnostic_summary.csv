@@ -1,0 +1,4 @@
+beads,dt,min_step,n_samples,nblocks,block_size,block_samples_used,discarded_tail_samples,Rg2_mean,Rg2_sem,timeseries_csv
+1.0,0.002,20000.0,801.0,20.0,40.0,800.0,1.0,0.0,0.0,runs/p01/quantum_uvt_rg2_timeseries.csv
+8.0,0.002,20000.0,801.0,20.0,40.0,800.0,1.0,0.0022762748815199066,4.2580307140080305e-05,runs/p08/quantum_uvt_rg2_timeseries.csv
+16.0,0.002,20000.0,801.0,20.0,40.0,800.0,1.0,0.0021050822675544568,5.427657868186592e-05,runs/p16/quantum_uvt_rg2_timeseries.csv

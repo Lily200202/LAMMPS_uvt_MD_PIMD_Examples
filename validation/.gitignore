@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.log
+log.*
+screen.*
+run.out
+*.pid
+*.lammpstrj
+*.xyz
+!water_32beads/input/init.xyz
+*.rdf
+*.png
+*.pdf
+runs/nsteps_*/

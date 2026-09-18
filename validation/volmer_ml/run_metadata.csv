@@ -1,0 +1,2 @@
+target,beads,dt,nsteps,thermo_freq,temp,mu,tdamp,udamp,tchain,tloop,vel_seed,ne_init,ne_vel_init,tdof,data_file,model_path,plugin_so
+pimd,"16",0.0002,300000,10,300.0,-3.0,0.05,0.05,3,1,4928459,0.648702,0.0,549.0,input/system.lmp,input/model.pb,libdeepmd_lmp.so

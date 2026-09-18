@@ -1,0 +1,68 @@
+clear
+
+variable        PLUGIN_SO       index libdeepmd_lmp.so
+variable        DATA_FILE       index system.lmp
+variable        MODEL_PATH      index model.pb
+variable        NSTEPS          index 300000
+variable        THERMO_FREQ     index 1
+variable        TEMP            index 300.0
+variable        MU              index -3.0
+variable        TDAMP           index 0.05
+variable        UDAMP           index 0.05
+variable        VEL_SEED        index 4928459
+variable        NE_INIT         index 0.648702
+variable        NE_VEL_INIT     index 0.0
+variable        DT              index 0.0002
+
+units           metal
+boundary        f p p
+atom_style      atomic
+atom_modify     map array
+
+plugin          load ${PLUGIN_SO}
+
+neighbor        1.0 bin
+read_data       ${DATA_FILE}
+
+mass            1 195.000000
+mass            2 1.000000
+mass            3 16.000000
+
+group           layer1 id 1:100:4
+group           layer2 id 2:100:4
+group           bottom union layer1 layer2
+group           move subtract all bottom
+group           Hads id 101:124
+
+compute         movetemp move temp
+compute         bottomtemp bottom temp
+
+pair_style      deepmd ${MODEL_PATH} fparam_from_fix cp 1
+pair_coeff      * *
+
+compute         dEdN all deepmd/fparam/dedn f_cp[1]
+
+fix             cp all uvt temp ${TEMP} ${TEMP} ${TDAMP} &
+                mu ${MU} ${MU} ${UDAMP} &
+                ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn c_dEdN
+fix_modify      cp temp movetemp
+
+fix             freeze bottom setforce 0.0 0.0 0.0
+fix             wall_all all wall/reflect xhi 17.462841
+fix             wall_hads Hads wall/reflect xhi 8.6785028
+velocity        move create ${TEMP} ${VEL_SEED}
+velocity        bottom set 0.0 0.0 0.0
+
+variable        Ne        equal f_cp[1]
+variable        NeDot     equal f_cp[3]
+variable        dEdNfix   equal f_cp[4]
+variable        muFix     equal f_cp[5]
+variable        Efix      equal f_cp
+
+thermo          ${THERMO_FREQ}
+thermo_style    custom step temp pe ke etotal c_movetemp c_bottomtemp &
+                v_Ne v_NeDot c_dEdN v_dEdNfix v_muFix v_Efix
+thermo_modify   flush yes
+
+timestep        ${DT}
+run             ${NSTEPS}

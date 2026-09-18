@@ -1,0 +1,2 @@
+beads,dt,nsteps,thermo_freq,temp,tdamp,udamp,tchain,tloop,mu,ne_init,ne_vel_init,x_centroid_init,x_spread,vx_init
+1;4;8;16,0.002,100000,100,1.0,0.5,0.5,3,1,1.0,2.1,0.0,1.0,0.3,-0.35
