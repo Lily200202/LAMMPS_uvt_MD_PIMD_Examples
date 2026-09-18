@@ -42,10 +42,9 @@ pair_coeff      * *
 
 compute         dEdN all deepmd/fparam/dedn f_cp[1]
 
-fix             cp all uvt temp ${TEMP} ${TEMP} ${TDAMP} &
+fix             cp move uvt temp ${TEMP} ${TEMP} ${TDAMP} &
                 mu ${MU} ${MU} ${UDAMP} &
                 ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn c_dEdN
-fix_modify      cp temp movetemp
 
 fix             freeze bottom setforce 0.0 0.0 0.0
 fix             wall_all all wall/reflect xhi 17.462841
