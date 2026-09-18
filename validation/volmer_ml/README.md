@@ -18,9 +18,8 @@ event index represents 0.005 ps. Seventeen of 200 trajectories reacted. The manu
 origin-constrained fit uses the first 16 ordered events (the 29.405 ps endpoint is excluded),
 giving `k_PCET = 3.71824 ns^-1` and uncentered `R^2 = 0.99347`.
 
-Raw trajectories total many gigabytes and are omitted. `analysis/prepare_compact_results.py`
-documents conversion of fresh LAMMPS logs into the archived compact series. Plotting and
-fitting scripts, and copies of the manuscript figures, are intentionally not duplicated here.
+Raw trajectories total many gigabytes and are omitted. Analysis, plotting, and fitting
+scripts, and copies of the manuscript figures, are intentionally not duplicated here.
 
 ## Run
 
