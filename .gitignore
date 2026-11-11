@@ -12,3 +12,4 @@ run.out
 *.png
 *.pdf
 runs/nsteps_*/
+reruns/

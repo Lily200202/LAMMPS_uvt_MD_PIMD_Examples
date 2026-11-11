@@ -5,6 +5,7 @@ variable        DATA_FILE       index system.lmp
 variable        MODEL_PATH      index model.pb
 variable        NSTEPS          index 300000
 variable        THERMO_FREQ     index 1
+variable        DUMP_FREQ       index 0
 variable        TEMP            index 300.0
 variable        MU              index -3.0
 variable        TDAMP           index 0.05
@@ -43,7 +44,7 @@ pair_coeff      * *
 compute         dEdN all deepmd/fparam/dedn f_cp[1]
 
 fix             cp move uvt temp ${TEMP} ${TEMP} ${TDAMP} &
-                mu ${MU} ${MU} ${UDAMP} &
+                mu ${MU} Udamp ${UDAMP} &
                 ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn c_dEdN
 
 fix             freeze bottom setforce 0.0 0.0 0.0
@@ -55,13 +56,19 @@ velocity        bottom set 0.0 0.0 0.0
 variable        Ne        equal f_cp[1]
 variable        NeDot     equal f_cp[3]
 variable        dEdNfix   equal f_cp[4]
-variable        muFix     equal f_cp[5]
+variable        muFix     equal v_MU
+variable        T_ins     equal f_cp[2]
 variable        Efix      equal f_cp
+
+# Optional trajectories for structural reductions; zero keeps them disabled.
+if "${DUMP_FREQ} > 0" then &
+  "dump trajectory all custom ${DUMP_FREQ} classical.lammpstrj id type x y z ix iy iz" &
+  "dump_modify trajectory sort id"
 
 thermo          ${THERMO_FREQ}
 thermo_style    custom step temp pe ke etotal c_movetemp c_bottomtemp &
-                v_Ne v_NeDot c_dEdN v_dEdNfix v_muFix v_Efix
-thermo_modify   flush yes
+                v_Ne v_NeDot c_dEdN v_dEdNfix v_muFix v_Efix v_T_ins
+thermo_modify   flush yes format float %.16g
 
 timestep        ${DT}
 run             ${NSTEPS}

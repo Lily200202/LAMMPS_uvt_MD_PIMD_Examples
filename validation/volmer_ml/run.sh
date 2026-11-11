@@ -3,10 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INPUT_DIR="${SCRIPT_DIR}/input"
-RUNS_DIR="${SCRIPT_DIR}/runs"
+RUNS_DIR="${RUNS_DIR:-${SCRIPT_DIR}/reruns}"
 
 LMP_BIN="${LMP_BIN:-lmp}"
 MPI_BIN="${MPI_BIN:-mpirun}"
+MPI_FLAGS="${MPI_FLAGS:-}"
+read -r -a MPI_FLAGS_ARRAY <<< "${MPI_FLAGS}"
 TARGET="${TARGET:-both}"
 BEADS="${BEADS:-16}"
 
@@ -22,6 +24,7 @@ DATA_FILE="${DATA_FILE:-${INPUT_DIR}/system.lmp}"
 MODEL_PATH="${MODEL_PATH:-${INPUT_DIR}/model.pb}"
 NSTEPS="${NSTEPS:-300000}"
 THERMO_FREQ="${THERMO_FREQ:-1}"
+DUMP_FREQ="${DUMP_FREQ:-0}"
 TEMP="${TEMP:-300.0}"
 MU="${MU:--3.0}"
 TDAMP="${TDAMP:-0.05}"
@@ -64,12 +67,42 @@ export DP_INTER_OP_PARALLELISM_THREADS="${DP_INTER_OP_PARALLELISM_THREADS:-1}"
 export LAMMPS_PLUGIN_PATH="${DEEPMD_PLUGIN_DIR}${LAMMPS_PLUGIN_PATH:+:${LAMMPS_PLUGIN_PATH}}"
 export LD_LIBRARY_PATH="${DEEPMD_RUNTIME_PATH}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
+[[ "${TCHAIN}" =~ ^[1-9][0-9]*$ ]] || { echo "TCHAIN must be positive" >&2; exit 1; }
+chain_energy_terms() {
+  local block="$1" index
+  local terms=()
+  for ((index=0; index<TCHAIN; index++)); do
+    terms+=("f_cp[$((17 + block*TCHAIN + index))]")
+  done
+  local IFS=+
+  echo "${terms[*]}"
+}
+nhc_potential="$(chain_energy_terms 2)"
+nhc_kinetic="$(chain_energy_terms 3)"
+
 mkdir -p "${RUNS_DIR}"
-cd "${SCRIPT_DIR}"
+RUNS_DIR="$(cd "${RUNS_DIR}" && pwd)"
+cd "${RUNS_DIR}"
+
+case "${TARGET}" in
+  classical|pimd|both) ;;
+  *) echo "TARGET must be one of: classical, pimd, both" >&2; exit 1 ;;
+esac
+case_dirs=()
+if [[ "${TARGET}" != "pimd" ]]; then case_dirs+=("${RUNS_DIR}/classical"); fi
+if [[ "${TARGET}" != "classical" ]]; then
+  for p in ${BEADS}; do case_dirs+=("${RUNS_DIR}/pimd_p$(printf "%02d" "${p}")"); done
+fi
+for case_dir in "${case_dirs[@]}"; do
+  if [[ -d "${case_dir}" ]] && find "${case_dir}" -mindepth 1 ! -name run.out -print -quit | grep -q .; then
+    echo "Refusing to overwrite non-empty case directory: ${case_dir}" >&2
+    exit 1
+  fi
+done
 
 cat > run_metadata.csv <<EOF
-target,beads,dt,nsteps,thermo_freq,temp,mu,tdamp,udamp,tchain,tloop,vel_seed,ne_init,ne_vel_init,tdof,data_file,model_path,plugin_so
-${TARGET},"${BEADS}",${DT},${NSTEPS},${THERMO_FREQ},${TEMP},${MU},${TDAMP},${UDAMP},${TCHAIN},${TLOOP},${VEL_SEED},${NE_INIT},${NE_VEL_INIT},${TDOF},${DATA_FILE},${MODEL_PATH},${PLUGIN_SO}
+target,beads,dt,nsteps,thermo_freq,dump_freq,temp,mu,tdamp,udamp,tchain,tloop,vel_seed,ne_init,ne_vel_init,tdof,data_file,model_path,plugin_so
+${TARGET},"${BEADS}",${DT},${NSTEPS},${THERMO_FREQ},${DUMP_FREQ},${TEMP},${MU},${TDAMP},${UDAMP},${TCHAIN},${TLOOP},${VEL_SEED},${NE_INIT},${NE_VEL_INIT},${TDOF},${DATA_FILE},${MODEL_PATH},${PLUGIN_SO}
 EOF
 
 run_classical() {
@@ -85,6 +118,7 @@ run_classical() {
       -var MODEL_PATH "${MODEL_PATH}" \
       -var NSTEPS "${NSTEPS}" \
       -var THERMO_FREQ "${THERMO_FREQ}" \
+      -var DUMP_FREQ "${DUMP_FREQ}" \
       -var TEMP "${TEMP}" \
       -var MU "${MU}" \
       -var TDAMP "${TDAMP}" \
@@ -101,10 +135,12 @@ run_pimd_case() {
   local beads="$1"
   local case_dir="${RUNS_DIR}/pimd_p$(printf "%02d" "${beads}")"
   mkdir -p "${case_dir}"
-  cp "${INPUT_DIR}/in.pimd_uvt_volmer.template.lmp" "${case_dir}/in.pimd_uvt_volmer.lmp"
+  sed -e "s|@NHC_POTENTIAL@|${nhc_potential}|g" \
+      -e "s|@NHC_KINETIC@|${nhc_kinetic}|g" \
+      "${INPUT_DIR}/in.pimd_uvt_volmer.template.lmp" > "${case_dir}/in.pimd_uvt_volmer.lmp"
   (
     cd "${case_dir}"
-    "${MPI_BIN}" --oversubscribe -np "${beads}" "${LMP_BIN}" \
+    "${MPI_BIN}" "${MPI_FLAGS_ARRAY[@]}" -np "${beads}" "${LMP_BIN}" \
       -partition "${beads}x1" \
       -in "${case_dir}/in.pimd_uvt_volmer.lmp" \
       -log log.pimd_uvt_volmer \
@@ -113,6 +149,7 @@ run_pimd_case() {
       -var MODEL_PATH "${MODEL_PATH}" \
       -var NSTEPS "${NSTEPS}" \
       -var THERMO_FREQ "${THERMO_FREQ}" \
+      -var DUMP_FREQ "${DUMP_FREQ}" \
       -var TEMP "${TEMP}" \
       -var MU "${MU}" \
       -var TDAMP "${TDAMP}" \

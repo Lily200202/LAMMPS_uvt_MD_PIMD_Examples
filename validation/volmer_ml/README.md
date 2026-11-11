@@ -31,7 +31,20 @@ PLUGIN_SO=/absolute/path/libdeepmd_lmp.so LMP_BIN=/path/to/lmp TARGET=classical 
 PLUGIN_SO=/absolute/path/libdeepmd_lmp.so LMP_BIN=/path/to/lmp TARGET=pimd BEADS=16 ./run.sh
 ```
 
-The classical input uses `f_cp[1]` for `N_e`. The PIMD input uses `f_cp[23]` because its
-`tchain=3` vector contains ten nuclear and twelve NHC entries before the UVT extension.
+The classical input uses `f_cp[1]` for `Ne`; the PIMD input uses `f_cp[11]`,
+independent of `TCHAIN`. Both `fparam_from_fix` and `deepmd/fparam/dedn` use this
+same electron number. PIMD `f_cp[14]` is the individual bead derivative; average
+it over bead logs for comparison with the imposed chemical potential.
+
+New runs and metadata are stored under `reruns/` by default; `RUNS_DIR` selects
+a different fresh root. `MPI_FLAGS` supplies optional launcher-specific flags.
+Set `DUMP_FREQ` to a positive step interval when structural trajectories are
+needed (zero, the default, disables trajectory output). Each PIMD bead writes
+its own sorted trajectory. For example, `DUMP_FREQ=100` records every 100 steps.
+
+These inputs reproduce the interface validation setup at the specified potential.
+They do not generate the 200 independently initialized reaction-rate trajectories;
+rerunning the rate calculation requires the original initial-state ensemble and
+state-assignment workflow. The archived rate events and fit remain historical data.
 
 Model SHA-256: `44695086af1fbaba1a907e76b31f68d4743637eb5c32be79b4c315319301949d`.

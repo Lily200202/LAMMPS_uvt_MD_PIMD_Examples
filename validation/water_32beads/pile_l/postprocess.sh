@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ANALYSIS_DIR="${SCRIPT_DIR}/../analysis"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-RUN_DIR="${1:-${SCRIPT_DIR}/runs/nsteps_100000}"
+RUN_DIR="${1:-${SCRIPT_DIR}/reruns/nsteps_100000}"
 
 cd "${RUN_DIR}"
 

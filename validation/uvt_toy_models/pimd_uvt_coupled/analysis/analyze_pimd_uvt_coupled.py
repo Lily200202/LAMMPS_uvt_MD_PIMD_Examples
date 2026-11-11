@@ -18,12 +18,12 @@ PARAMS = {
 }
 
 
-def analytical_reference() -> dict[str, float]:
+def analytical_reference(mu: float | None = None) -> dict[str, float]:
     kx = PARAMS["kx"]
     ke = PARAMS["ke"]
     g = PARAMS["g"]
     n0 = PARAMS["N0"]
-    mu = PARAMS["mu"]
+    mu = PARAMS["mu"] if mu is None else mu
     denom = kx * ke - g * g
     return {
         "denom": denom,
@@ -119,8 +119,12 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
     dt = float(meta["dt"])
 
     logs = log_paths(case_dir)
+    if len(logs) != beads:
+        raise SystemExit(f"Expected {beads} bead logs in {case_dir}, found {len(logs)}")
     parsed = [parse_log(path) for path in logs]
     header = parsed[0][0]
+    if any(other_header != header for other_header, _ in parsed):
+        raise SystemExit(f"Inconsistent thermo headers across bead logs in {case_dir}")
     columns = {name: i for i, name in enumerate(header)}
     required = [
         "Step",
@@ -129,7 +133,8 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         "v_Ne_now",
         "v_Ne_dot_now",
         "v_dEdN_local",
-        "v_dEdN_avg",
+        "v_dEdN_bead",
+        "v_T_ins",
         "v_mu_now",
         "v_ne_ke",
         "v_uvt_extra",
@@ -137,8 +142,6 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         "v_nhc_potential",
         "v_nhc_kinetic",
         "v_u_toy",
-        "v_nuclear_ecouple",
-        "v_ne_ecouple",
         "v_total_ecouple",
     ]
     missing = [name for name in required if name not in columns]
@@ -153,10 +156,12 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
     if not common_steps:
         raise SystemExit(f"No common thermo steps across bead logs in {case_dir}")
 
-    ref = analytical_reference()
+    mu_target = float(meta.get("mu", PARAMS["mu"]))
+    temp_target = float(meta.get("temp", PARAMS["T"]))
+    ref = analytical_reference(mu_target)
     timeseries_rows: list[dict[str, float]] = []
     shared_ne_std = []
-    shared_dedn_std = []
+    dedn_interface_error = []
     hp_partition_std = []
 
     for step in common_steps:
@@ -166,7 +171,8 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         dedn_local = np.array([row[columns["v_dEdN_local"]] for row in rows], dtype=float)
         ne_all = np.array([row[columns["v_Ne_now"]] for row in rows], dtype=float)
         ne_dot_all = np.array([row[columns["v_Ne_dot_now"]] for row in rows], dtype=float)
-        dedn_avg_all = np.array([row[columns["v_dEdN_avg"]] for row in rows], dtype=float)
+        dedn_interface_all = np.array([row[columns["v_dEdN_bead"]] for row in rows], dtype=float)
+        temp_combined = float(np.mean([row[columns["v_T_ins"]] for row in rows]))
         mu_all = np.array([row[columns["v_mu_now"]] for row in rows], dtype=float)
         ne_ke_all = np.array([row[columns["v_ne_ke"]] for row in rows], dtype=float)
         uvt_extra_all = np.array([row[columns["v_uvt_extra"]] for row in rows], dtype=float)
@@ -174,12 +180,10 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         nhc_pot_all = np.array([row[columns["v_nhc_potential"]] for row in rows], dtype=float)
         nhc_ke_all = np.array([row[columns["v_nhc_kinetic"]] for row in rows], dtype=float)
         u_toy_all = np.array([row[columns["v_u_toy"]] for row in rows], dtype=float)
-        nuclear_ecouple_all = np.array([row[columns["v_nuclear_ecouple"]] for row in rows], dtype=float)
-        ne_ecouple_all = np.array([row[columns["v_ne_ecouple"]] for row in rows], dtype=float)
         total_ecouple_all = np.array([row[columns["v_total_ecouple"]] for row in rows], dtype=float)
 
         shared_ne_std.append(float(np.std(ne_all, ddof=0)))
-        shared_dedn_std.append(float(np.std(dedn_avg_all, ddof=0)))
+        dedn_interface_error.append(float(np.max(np.abs(dedn_interface_all - dedn_local))))
         hp_partition_std.append(float(np.std(hp_all, ddof=0)))
 
         row0 = rows[0]
@@ -189,7 +193,7 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         dedn_bead_avg = float(np.mean(dedn_local))
         ne = float(row0[columns["v_Ne_now"]])
         ne_dot = float(row0[columns["v_Ne_dot_now"]])
-        dedn_avg = float(row0[columns["v_dEdN_avg"]])
+        dedn_avg = float(np.mean(dedn_interface_all))
         mu_now = float(row0[columns["v_mu_now"]])
         h_p = float(np.mean(hp_all))
         h_nhc = float(np.sum(nhc_pot_all + nhc_ke_all))
@@ -197,8 +201,6 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         u_toy_sum = float(np.sum(u_toy_all))
         ne_ke = float(np.mean(ne_ke_all))
         uvt_extra = float(np.mean(uvt_extra_all))
-        nuclear_ecouple = float(np.mean(nuclear_ecouple_all))
-        ne_ecouple = float(np.mean(ne_ecouple_all))
         total_ecouple = float(np.mean(total_ecouple_all))
         legendre = -mu_now * ne
         # The PIMD/UVT electronic coordinate is shared by all beads.  The
@@ -216,6 +218,7 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
                 "time": time,
                 "beads": float(beads),
                 "temp_nuclear": temp_nuclear,
+                "temp_combined": temp_combined,
                 "x_centroid": x_centroid,
                 "xstar": ref["xstar"],
                 "Ne": ne,
@@ -224,7 +227,7 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
                 "dEdN_avg": dedn_avg,
                 "dEdN_bead_avg": dedn_bead_avg,
                 "mu": mu_now,
-                "dEdN_minus_mu": dedn_avg - PARAMS["mu"],
+                "dEdN_minus_mu": dedn_avg - mu_target,
                 "h_p": h_p,
                 "u_toy_sum": u_toy_sum,
                 "h_nhc": h_nhc,
@@ -232,8 +235,6 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
                 "ne_kinetic": ne_ke,
                 "legendre_minus_mu_ne": legendre,
                 "uvt_extra": uvt_extra,
-                "nuclear_ecouple": nuclear_ecouple,
-                "ne_ecouple": ne_ecouple,
                 "total_ecouple": total_ecouple,
                 "h_ext_uvt": h_ext_uvt,
                 "h_ext_work": h_ext_work,
@@ -299,7 +300,7 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         "x_centroid_bias": x_mean - ref["xstar"],
         "temp_nuclear_mean": temp_mean,
         "temp_nuclear_sem": temp_sem,
-        "temp_nuclear_bias": temp_mean - PARAMS["T"],
+        "temp_nuclear_bias": temp_mean - temp_target,
         "Ne_mean": ne_mean,
         "Ne_sem": ne_sem,
         "Ne_bias": ne_mean - ref["nestar"],
@@ -308,7 +309,7 @@ def analyze_case(case_dir: Path, min_step: int, out_prefix: str) -> dict[str, fl
         "dEdN_minus_mu_mean": dedn_bias_mean,
         "dEdN_minus_mu_sem": dedn_bias_sem,
         "shared_Ne_std_max": max(shared_ne_std),
-        "shared_dEdN_std_max": max(shared_dedn_std),
+        "dedn_interface_error_max": max(dedn_interface_error),
         "h_ext_initial": h_ext0,
         "delta_h_ext_mean": float(np.mean(delta_h)),
         "delta_h_ext_std": float(np.std(delta_h, ddof=0)),
@@ -348,7 +349,7 @@ def main() -> None:
     parser.add_argument("--runs-dir", default="runs")
     parser.add_argument("--min-step", type=int, default=20000)
     parser.add_argument("--summary", default="pimd_uvt_coupled_summary.csv")
-    parser.add_argument("--classical-summary", default="../classical_coupled/classical_uvt_summary.csv")
+    parser.add_argument("--classical-summary", help="Optional fresh classical summary; archived data are not used automatically")
     parser.add_argument("--classical-output", default="pimd_uvt_classical_limit.csv")
     parser.add_argument("--prefix", default="pimd_uvt_coupled")
     args = parser.parse_args()
@@ -373,7 +374,7 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(summaries)
 
-    classical = read_classical_summary((case_root / args.classical_summary).resolve())
+    classical = read_classical_summary((case_root / args.classical_summary).resolve()) if args.classical_summary else None
     p1_row = next((row for row in summaries if int(row["beads"]) == 1), None)
     if p1_row is not None:
         comparison = {

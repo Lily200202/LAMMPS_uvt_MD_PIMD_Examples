@@ -3,7 +3,7 @@
 The two cases use
 
 ```text
-U(x, N_e) = k_x x^2 / 2 + k_e (N_e - N_0)^2 / 2 + g x (N_e - N_0)
+U(x, N_e) = k_x x^2 / 2 + k_e (N_e - N_0)^2 / 2 + g x N_e
 ```
 
 to validate classical and path-integral constant-potential propagation against an

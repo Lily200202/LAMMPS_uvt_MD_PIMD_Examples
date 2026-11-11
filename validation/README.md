@@ -17,17 +17,40 @@ Plotting/fitting scripts and duplicate copies of manuscript figures are intentio
 | Figure 7 | `volmer_ml` | 16-bead ML TP-PIMD input, compact time series, and O-H distributions |
 | SI Figure S4 | `uvt_toy_models/pimd_uvt_coupled` | P=1/8/16 bead-convergence analysis |
 
-## Software provenance
+## Software provenance and current inputs
 
-- LAMMPS implementation: [lammps/lammps PR #5107](https://github.com/lammps/lammps/pull/5107)
-- Development branch used to curate these examples: commit
-  [`689ecc2d2368e5861131c4a948a6f23f8c750258`](https://github.com/Lily200202/lammps/commit/689ecc2d2368e5861131c4a948a6f23f8c750258)
-- DeepMD-kit interface: [deepmodeling/deepmd-kit PR #5498](https://github.com/deepmodeling/deepmd-kit/pull/5498)
+The retained numerical CSVs and original metadata are archival results from the
+manuscript calculations. Their curation snapshot is
+[`689ecc2d2368e5861131c4a948a6f23f8c750258`](https://github.com/Lily200202/lammps/commit/689ecc2d2368e5861131c4a948a6f23f8c750258).
+They have not been regenerated or relabeled by this input migration.
 
-The classical `fix uvt` output layout in the cited implementation places `N_e` at
-`f_cp[1]`, independent of `tchain`. For `fix pimd/uvt`, ten nuclear outputs and the NHC
-vectors precede the UVT extension; with the manuscript setting `tchain 3`, `N_e` is
-`f_cp[23]`. The supplied inputs reflect these exact layouts.
+The runnable inputs now target the interface in
+[`efa58a5a9858abaf70431be4c49a62dd38d6b135`](https://github.com/Lily200202/lammps/commit/efa58a5a9858abaf70431be4c49a62dd38d6b135)
+on `Lily200202/lammps`, branch `constant-potential-uvt-pimd-uvt`.
+The implementation is also proposed in [lammps/lammps PR #5107](https://github.com/lammps/lammps/pull/5107).
+For submission reruns, choose the final reviewed code revision, record its full
+commit ID, and rebuild LAMMPS and its plugins against the same headers and MPI.
+The DeepMD electron-number interface is proposed in
+[deepmodeling/deepmd-kit PR #5498](https://github.com/deepmodeling/deepmd-kit/pull/5498).
+
+| Quantity | `fix uvt` | `fix pimd/uvt` |
+| --- | --- | --- |
+| Electron number | `f_cp[1]` | `f_cp[11]` |
+| Combined temperature | `f_cp[2]` | `f_cp[12]` |
+| Electron-number velocity | `f_cp[3]` | `f_cp[13]` |
+| Energy derivative | `f_cp[4]` | `f_cp[14]` (individual bead) |
+| Electronic kinetic energy | `f_cp[5]` | `f_cp[15]` |
+| Electronic potential `-mu*Ne` | `f_cp[6]` | `f_cp[16]` |
+
+These six indices do not depend on `tchain`. PIMD NHC outputs start at entry 17;
+the launchers generate chain-energy expressions for the selected `TCHAIN`.
+Average the PIMD derivative over bead logs before comparing it with `mu`.
+The chemical-potential target is printed from the input variable because it is
+no longer a fix-vector output. Separate nuclear/electronic thermostat-work
+vector entries are no longer available; the PIMD fix scalar reports their total.
+
+New runs use separate `reruns/` directories by default. See
+[`RERUN.md`](RERUN.md) for the complete rerun commands and output locations.
 
 ## Raw-data policy
 

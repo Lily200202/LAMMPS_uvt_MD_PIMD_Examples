@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LMP_BIN="${LMP_BIN:-lmp}"
 MPI_BIN="${MPI_BIN:-mpirun}"
-MPI_FLAGS="${MPI_FLAGS:---use-hwthread-cpus}"
+MPI_FLAGS="${MPI_FLAGS:-}"
 NP="${NP:-32}"
 PARTITION="${PARTITION:-32x1}"
 
@@ -20,7 +20,7 @@ DEEPMD_RUNTIME_PATH="${DEEPMD_LIB_DIR}:${DEEPMD_OP_DIR}${TENSORFLOW_LIB_DIR:+:${
 DATA_FILE="${DATA_FILE:-${SCRIPT_DIR}/../input/conf.lmp}"
 MODEL_PATH="${MODEL_PATH:-${SCRIPT_DIR}/../input/graph.pb}"
 NSTEPS="${NSTEPS:-100000}"
-RUN_DIR="${RUN_DIR:-${SCRIPT_DIR}/runs/nsteps_${NSTEPS}}"
+RUN_DIR="${RUN_DIR:-${SCRIPT_DIR}/reruns/nsteps_${NSTEPS}}"
 THERMO_FREQ="${THERMO_FREQ:-100}"
 DUMP_FREQ="${DUMP_FREQ:-100}"
 TEMP="${TEMP:-300.0}"

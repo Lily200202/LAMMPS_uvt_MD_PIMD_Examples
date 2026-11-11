@@ -14,6 +14,7 @@ variable        TEMP equal 1.0
 
 variable        DT index 0.002
 variable        TDAMP index 0.5
+variable        UDAMP index 0.5
 variable        NSTEPS index 200000
 variable        THERMO_FREQ index 100
 variable        X_INIT index 1.0
@@ -39,17 +40,20 @@ compute         t1d all temp/partial 1 0 0
 compute_modify  t1d extra/dof 0
 
 fix             toy all uvt/toy/coupled cp kx ${kx} ke ${ke} g ${g} n0 ${N0}
-fix             cp all uvt temp ${TEMP} ${TEMP} ${TDAMP} mu ${MU} ${MU} ${TDAMP} &
+fix             cp all uvt temp ${TEMP} ${TEMP} ${TDAMP} mu ${MU} Udamp ${UDAMP} &
                 ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn f_toy
-fix_modify      cp temp t1d
+# One nuclear x DOF plus the electronic DOF in the joint thermostat.
+compute_modify  cp_temp extra/dof 2
 
 variable        xcm equal f_toy[3]
 variable        xstar equal -v_g*(v_MU+v_ke*v_N0)/(v_kx*v_ke-v_g*v_g)
 variable        nestar equal v_kx*(v_MU+v_ke*v_N0)/(v_kx*v_ke-v_g*v_g)
 
-variable        Ne equal f_toy[4]
+variable        Ne equal f_cp[1]
 variable        Ne_dot equal f_cp[3]
-variable        dEdN equal f_toy[2]
+variable        dEdN equal f_toy[4]
+variable        mu_target equal v_MU
+variable        T_ins equal f_cp[2]
 variable        u_elec equal 0.5*v_ke*(v_Ne-v_N0)*(v_Ne-v_N0)
 variable        u_total equal f_toy[1]
 variable        h_ext equal ke + v_u_total + f_cp
@@ -57,7 +61,7 @@ variable        delta_h_ext equal v_h_ext
 
 thermo          ${THERMO_FREQ}
 thermo_style    custom step temp ke pe etotal v_xcm v_xstar v_Ne v_nestar v_Ne_dot v_dEdN &
-                f_cp[5] f_cp v_u_elec v_u_total v_h_ext
-thermo_modify   temp t1d
+                v_mu_target f_cp v_u_elec v_u_total v_h_ext v_T_ins
+thermo_modify   temp t1d format float %.16g
 
 run             ${NSTEPS}

@@ -42,7 +42,7 @@ variable        xinit world @XINIT_WORLD@
 set             atom 1 x ${xinit} y 0.0 z 0.0
 
 fix             toy all uvt/toy/coupled cp kx 5.0 ke 5.0 g 2.0 n0 1.0
-fix             cp all pimd/uvt thermostat NHC temp ${TEMP} &
+fix             cp all pimd/uvt method nmpimd thermostat NHC temp ${TEMP} &
                 Tdamp ${TDAMP} tchain ${TCHAIN} tloop ${TLOOP} mu ${MU} Udamp ${UDAMP} &
                 ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn f_toy tdof 1.0 removecom no
 
@@ -50,28 +50,29 @@ variable        xlocal equal f_toy[3]
 variable        xstar equal -v_g*(v_MU+v_ke*v_N0)/(v_kx*v_ke-v_g*v_g)
 variable        nestar equal v_kx*(v_MU+v_ke*v_N0)/(v_kx*v_ke-v_g*v_g)
 
-variable        Ne_now equal f_cp[23]
-variable        Ne_dot_now equal f_cp[24]
-variable        dEdN_avg equal f_cp[25]
-variable        mu_now equal f_cp[26]
-variable        ne_ke equal f_cp[27]
-variable        uvt_extra equal f_cp[28]
-variable        nuclear_ecouple equal f_cp[29]
-variable        ne_ecouple equal f_cp[30]
-variable        total_ecouple equal f_cp[31]
-variable        dEdN_local equal f_toy[2]
+variable        Ne_now equal f_cp[11]
+variable        Ne_dot_now equal f_cp[13]
+variable        dEdN_bead equal f_cp[14]
+variable        mu_now equal v_MU
+variable        T_ins equal f_cp[12]
+variable        ne_ke equal f_cp[15]
+variable        uvt_extra equal f_cp[16]
+variable        total_ecouple equal f_cp
+variable        dEdN_local equal f_toy[4]
 variable        ke_bead equal f_cp[1]
 variable        temp_nuclear equal 2.0*v_ke_bead
 variable        h_p equal f_cp[4]
-variable        nhc_potential equal f_cp[17]+f_cp[18]+f_cp[19]
-variable        nhc_kinetic equal f_cp[20]+f_cp[21]+f_cp[22]
+variable        nhc_potential equal @NHC_POTENTIAL@
+variable        nhc_kinetic equal @NHC_KINETIC@
 variable        nhc_total equal v_nhc_potential+v_nhc_kinetic
 variable        u_toy equal f_toy[1]
 
 thermo          ${THERMO_FREQ}
 thermo_style    custom step v_temp_nuclear v_ke_bead v_xlocal v_xstar v_Ne_now v_nestar v_Ne_dot_now &
-                v_dEdN_local v_dEdN_avg v_mu_now v_ne_ke v_uvt_extra v_h_p &
+                v_dEdN_local v_dEdN_bead v_mu_now v_ne_ke v_uvt_extra v_h_p &
                 v_nhc_potential v_nhc_kinetic v_nhc_total v_u_toy &
-                v_nuclear_ecouple v_ne_ecouple v_total_ecouple
+                v_total_ecouple v_T_ins
+
+thermo_modify   format float %.16g
 
 run             ${NSTEPS}
