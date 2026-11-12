@@ -15,6 +15,21 @@ LAMMPS, then run:
 LMP_BIN=/path/to/lmp MPIEXEC=/path/to/mpirun BEADS="1 8 16" ./run.sh
 ```
 
-The default input uses `tchain=3`; therefore the PIMD/UVT physical extension starts at
-`f_cp[23]`. `postprocess.sh` regenerates numerical summary CSVs only. Plotting scripts and
-manuscript figures are not included.
+The physical output block starts at `f_cp[11]`, independent of `TCHAIN`.
+The launcher fills the NHC energy expressions for the selected chain length.
+New inputs, logs, and metadata are written under `reruns/` by default;
+set `CASE_ROOT` to select a fresh output root. `MPI_FLAGS` supplies launcher-specific
+options; it is empty by default. For Open MPI on a smaller local machine,
+`MPI_FLAGS="--oversubscribe"` can be set explicitly.
+
+`postprocess.sh` reads this new output root and regenerates numerical summary
+CSVs there. It averages `f_cp[14]` over beads; it does not treat each bead's
+value as an already averaged response. Removed separate thermostat-work fields
+are omitted, while total work comes from the fix scalar. The combined temperature
+is retained alongside the nuclear temperature. The archived CSVs remain unchanged.
+
+The reduction checks the number of bead logs and their headers before combining
+them. It needs at least 20 production samples for its existing block-SEM estimate.
+An optional `CLASSICAL_SUMMARY` must identify a newly generated classical summary;
+archived classical results are not automatically mixed with fresh PIMD data.
+Plotting scripts and manuscript figures are not included.

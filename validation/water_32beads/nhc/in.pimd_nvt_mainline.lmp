@@ -45,7 +45,7 @@ dump_modify            2 sort id
 compute                rdf all rdf ${RDF_NBINS} 1 1 1 2 2 2
 fix                    2 all ave/time ${RDF_NEVERY} ${RDF_NREPEAT} ${RDF_NFREQ} c_rdf[*] file ${ibead}.rdf mode vector
 
-fix                    1 all pimd/nvt integrator obabo temp ${TEMP} Tdamp ${TDAMP} tchain ${TCHAIN} tloop ${TLOOP}
+fix                    1 all pimd/nvt method nmpimd thermostat NHC integrator obabo temp ${TEMP} Tdamp ${TDAMP} tchain ${TCHAIN} tloop ${TLOOP}
 thermo                 ${THERMO_FREQ}
 thermo_style           custom step temp pe ke etotal vol lx ly lz density f_1[*]
 thermo_modify          format step %ld format 2* "%.6e"

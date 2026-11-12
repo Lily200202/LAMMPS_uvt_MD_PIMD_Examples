@@ -6,6 +6,7 @@ variable        DATA_FILE       index system.lmp
 variable        MODEL_PATH      index model.pb
 variable        NSTEPS          index 300000
 variable        THERMO_FREQ     index 1
+variable        DUMP_FREQ       index 0
 variable        TEMP            index 300.0
 variable        MU              index -3.0
 variable        TDAMP           index 0.05
@@ -42,12 +43,12 @@ group           Hads id 101:124
 compute         movetemp move temp
 compute         bottomtemp bottom temp
 
-pair_style      deepmd ${MODEL_PATH} fparam_from_fix cp 23
+pair_style      deepmd ${MODEL_PATH} fparam_from_fix cp 11
 pair_coeff      * *
 
-compute         dEdN all deepmd/fparam/dedn f_cp[23]
+compute         dEdN all deepmd/fparam/dedn f_cp[11]
 
-fix             cp all pimd/uvt thermostat NHC temp ${TEMP} Tdamp ${TDAMP} &
+fix             cp all pimd/uvt method nmpimd thermostat NHC temp ${TEMP} Tdamp ${TDAMP} &
                 tchain ${TCHAIN} tloop ${TLOOP} mu ${MU} Udamp ${UDAMP} &
                 ne ${NE_INIT} ne_velocity ${NE_VEL_INIT} dedn c_dEdN &
                 tdof ${TDOF} removecom no
@@ -58,24 +59,30 @@ fix             wall_hads Hads wall/reflect xhi 8.6785028
 velocity        move create ${TEMP} ${BEAD_SEED} mom yes rot yes dist gaussian temp movetemp
 velocity        bottom set 0.0 0.0 0.0
 
-variable        Ne        equal f_cp[23]
-variable        NeDot     equal f_cp[24]
-variable        dEdNfix   equal f_cp[25]
-variable        muFix     equal f_cp[26]
-variable        NeKE      equal f_cp[27]
-variable        MuPE      equal f_cp[28]
+variable        Ne        equal f_cp[11]
+variable        NeDot     equal f_cp[13]
+variable        dEdNfix   equal f_cp[14]
+variable        muFix     equal v_MU
+variable        T_ins     equal f_cp[12]
+variable        NeKE      equal f_cp[15]
+variable        MuPE      equal f_cp[16]
 variable        Ecouple   equal f_cp
 variable        HP        equal f_cp[4]
-variable        NHCPot    equal f_cp[17]+f_cp[18]+f_cp[19]
-variable        NHCKin    equal f_cp[20]+f_cp[21]+f_cp[22]
+variable        NHCPot    equal @NHC_POTENTIAL@
+variable        NHCKin    equal @NHC_KINETIC@
 variable        NHCTotal  equal v_NHCPot+v_NHCKin
+
+# Optional trajectories for structural reductions; zero keeps them disabled.
+if "${DUMP_FREQ} > 0" then &
+  "dump trajectory all custom ${DUMP_FREQ} bead.${ibead}.lammpstrj id type x y z ix iy iz" &
+  "dump_modify trajectory sort id"
 
 thermo          ${THERMO_FREQ}
 thermo_style    custom step temp pe ke etotal c_movetemp c_bottomtemp &
                 v_Ne v_NeDot c_dEdN v_dEdNfix v_muFix v_NeKE v_MuPE v_Ecouple &
                 f_cp[1] f_cp[2] f_cp[3] f_cp[4] &
-                v_HP v_NHCPot v_NHCKin v_NHCTotal
-thermo_modify   flush yes
+                v_HP v_NHCPot v_NHCKin v_NHCTotal v_T_ins
+thermo_modify   flush yes format float %.16g
 
 timestep        ${DT}
 run             ${NSTEPS}

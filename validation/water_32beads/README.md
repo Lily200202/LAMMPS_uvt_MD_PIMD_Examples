@@ -21,4 +21,10 @@ PLUGIN_SO=/absolute/path/libdeepmd_lmp.so LMP_BIN=/path/to/lmp ./pile_l/run.sh
 PLUGIN_SO=/absolute/path/libdeepmd_lmp.so LMP_BIN=/path/to/lmp ./nhc/run.sh
 ```
 
+Both inputs explicitly select `method nmpimd`. Fresh outputs are written to each
+case's `reruns/nsteps_100000/` directory by default; `RUN_DIR` overrides this path.
+`postprocess.sh` accepts the run directory as its first argument.
+`MPI_FLAGS` is empty by default, so the launchers work with MPI implementations
+that do not support Open MPI-specific options. Set any such options explicitly.
+
 Model SHA-256: `c272f943c16ae7d821d5f34693db626b0a9b503d345bb0c892135326fc83a233`.

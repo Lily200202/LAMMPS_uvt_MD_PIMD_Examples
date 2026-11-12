@@ -3,10 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INPUT_DIR="${SCRIPT_DIR}/input"
-RUNS_DIR="${SCRIPT_DIR}/runs"
+CASE_ROOT="${CASE_ROOT:-${SCRIPT_DIR}/reruns}"
+RUNS_DIR="${RUNS_DIR:-${CASE_ROOT}/runs}"
 
 LMP_BIN="${LMP_BIN:-lmp}"
 MPIEXEC="${MPIEXEC:-mpirun}"
+MPI_FLAGS="${MPI_FLAGS:-}"
+read -r -a MPI_FLAGS_ARRAY <<< "${MPI_FLAGS}"
 BEADS="${BEADS:-1 8 16}"
 NSTEPS="${NSTEPS:-100000}"
 THERMO_FREQ="${THERMO_FREQ:-100}"
@@ -33,8 +36,31 @@ if [[ ! -x "${MPIEXEC}" ]] && ! command -v "${MPIEXEC}" >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "${RUNS_DIR}"
-cd "${SCRIPT_DIR}"
+[[ "${TCHAIN}" =~ ^[1-9][0-9]*$ ]] || { echo "TCHAIN must be positive" >&2; exit 1; }
+chain_energy_terms() {
+  local block="$1" index
+  local terms=()
+  for ((index=0; index<TCHAIN; index++)); do
+    terms+=("f_cp[$((17 + block*TCHAIN + index))]")
+  done
+  local IFS=+
+  echo "${terms[*]}"
+}
+nhc_potential="$(chain_energy_terms 2)"
+nhc_kinetic="$(chain_energy_terms 3)"
+
+mkdir -p "${RUNS_DIR}" "${CASE_ROOT}"
+RUNS_DIR="$(cd "${RUNS_DIR}" && pwd)"
+CASE_ROOT="$(cd "${CASE_ROOT}" && pwd)"
+cd "${CASE_ROOT}"
+
+for p in ${BEADS}; do
+  case_dir="${RUNS_DIR}/p$(printf "%02d" "${p}")"
+  if [[ -d "${case_dir}" ]] && find "${case_dir}" -mindepth 1 ! -name run.out -print -quit | grep -q .; then
+    echo "Refusing to overwrite non-empty case directory: ${case_dir}" >&2
+    exit 1
+  fi
+done
 
 cat > run_metadata.csv <<EOF
 beads,dt,nsteps,thermo_freq,temp,tdamp,udamp,tchain,tloop,mu,ne_init,ne_vel_init,x_centroid_init,x_spread,vx_init
@@ -71,6 +97,8 @@ for p in ${BEADS}; do
 
   sed \
     -e "s|@XINIT_WORLD@|${xworld}|g" \
+    -e "s|@NHC_POTENTIAL@|${nhc_potential}|g" \
+    -e "s|@NHC_KINETIC@|${nhc_kinetic}|g" \
     "${INPUT_DIR}/in.pimd_uvt_coupled.template.lmp" > "${input_file}"
 
   cat > "${case_dir}/case_metadata.csv" <<EOF
@@ -85,7 +113,7 @@ EOF
     export OMPI_MCA_opal_warn_on_missing_libcuda=0
     export OMP_NUM_THREADS=1
 
-    "${MPIEXEC}" --oversubscribe -np "${p}" "${LMP_BIN}" \
+    "${MPIEXEC}" "${MPI_FLAGS_ARRAY[@]}" -np "${p}" "${LMP_BIN}" \
       -partition "${p}x1" \
       -in "${input_file}" \
       -log log.pimd_uvt_coupled \
